@@ -1,6 +1,6 @@
 const { app, expressWs } = require("./app");
 const { ChatCtl } = require("./chatController");
-const { get } = require("lodash");
+const url = require("url");
 
 const wss = expressWs.getWss();
 
@@ -9,13 +9,17 @@ const heartbeat = (ws) => {
   ws.isAlive = true;
 };
 
-app.ws("/chat", function (ws, req) {
-  ws.on("message", function (msg) {
+app.ws("/chat", (ws, req) => {
+  ws.on("message", (msg) => {
     const msgObj = JSON.parse(msg);
-    const msgTxt = get(msgObj, "body.msg");
     const ip = req.headers["x-real-ip"];
-    ChatCtl.sendAll(wss, msgTxt, ip);
+    ChatCtl.handleMsg(wss, ws, msgObj, ip);
   });
+
+  const queryData = url.parse(req.url, true).query;
+  ws.clientData = queryData;
+  console.log("queryData: ", queryData);
+  ChatCtl.accept(ws);
 
   const ip = req.headers["x-real-ip"];
   console.log(`Joined WS with IP: ${ip}`);

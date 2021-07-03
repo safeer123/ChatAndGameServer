@@ -1,13 +1,27 @@
 const moment = require("moment");
+const { get } = require("lodash");
+const { v4: uuidv4 } = require("uuid");
 
 class ChatController {
-  createChatMessage(msg, from) {
+  createAcceptedConfirmationMessage(userId) {
+    const obj = {
+      type: "ACCEPTED",
+      body: {
+        userId,
+        t: moment().valueOf()
+      }
+    };
+    return JSON.stringify(obj);
+  }
+
+  createChatMessage(msg, nickname, userId, ip) {
     const obj = {
       type: "CHAT",
       body: {
         msg,
-        from,
-        time: moment().format("MMM-DD HH:mm:ss"),
+        from: nickname,
+        ip,
+        userId,
         t: moment().valueOf()
       }
     };
@@ -24,16 +38,34 @@ class ChatController {
     return JSON.stringify(obj);
   }
 
-  sendAll(wss, msg, from) {
+  sendAll(wss, msg, sender) {
     wss.clients.forEach((ws) => {
-      ws.send(this.createChatMessage(msg, from));
+      ws.send(this.createChatMessage(msg, sender, "null", "null"));
     });
+  }
+
+  handleMsg(wss, wsSender, msgObj, ip) {
+    const msgTxt = get(msgObj, "body.msg");
+    const userId = get(msgObj, "body.userId");
+    const nickname = get(wsSender, "clientData.nickname");
+
+    if (msgTxt && userId) {
+      wss.clients.forEach((ws) => {
+        ws.send(this.createChatMessage(msgTxt, nickname, userId, ip));
+      });
+    }
   }
 
   sendHeartbeatToAll(wss, n) {
     wss.clients.forEach((ws) => {
       ws.send(this.createHeartbeatMessage(n));
     });
+  }
+
+  accept(ws) {
+    const userId = uuidv4();
+    ws.userId = userId;
+    ws.send(this.createAcceptedConfirmationMessage(userId));
   }
 }
 
